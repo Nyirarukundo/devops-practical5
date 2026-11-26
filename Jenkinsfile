@@ -3,6 +3,7 @@ pipeline {
 
     environment {
         PATH = "C:\\Users\\usert\\AppData\\Local\\Programs\\DockerDesktop\\resources\\bin;${env.PATH}"
+        DOCKER_IMAGE = "nyirarukundo/my-web-app"
     }
 
     stages {
@@ -24,13 +25,23 @@ pipeline {
                 bat 'npm test'
             }
         }
-        stage('Deploy') {
+        stage('Build Docker Image') {
             steps {
-                echo 'Building and deploying Docker container...'
-                bat 'docker build -t devops-web-app .'
-                bat 'docker stop my-web-app || exit 0'
-                bat 'docker rm my-web-app || exit 0'
-                bat 'docker run -d -p 3000:3000 --name my-web-app devops-web-app'
+                bat 'docker build -t %DOCKER_IMAGE%:latest .'
+            }
+        }
+        stage('Push to Docker Hub') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    bat 'docker login -u %DOCKER_USER% -p %DOCKER_PASS%'
+                    bat 'docker push %DOCKER_IMAGE%:latest'
+                }
+            }
+        }
+        stage('Deploy to Local Docker Host') {
+            steps {
+                bat 'docker rm -f my-web-app || exit 0'
+                bat 'docker run -d --name my-web-app -p 3000:3000 %DOCKER_IMAGE%:latest'
             }
         }
     }
